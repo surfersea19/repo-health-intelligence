@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Repo Health Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3d;
+    --accent: #00ff9d;
+    --accent2: #7c3aed;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── Header ── */
+  header {
+    margin-bottom: 48px;
+    border-left: 3px solid var(--accent);
+    padding-left: 20px;
+  }
+
+  header .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  header h1 {
+    font-family: var(--font-sans);
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fff;
+  }
+
+  header p {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── Input section ── */
+  .input-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .input-group {
+    flex: 1;
+    min-width: 260px;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  input[type="text"]::placeholder { color: var(--muted); }
+
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 11px 28px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Status bar ── */
+  #status {
+    display: none;
+    font-size: 12px;
+    color: var(--accent);
+    padding: 10px 14px;
+    background: rgba(0,255,157,0.06);
+    border: 1px solid rgba(0,255,157,0.2);
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }
+
+  #status.error {
+    color: var(--danger);
+    background: rgba(239,68,68,0.06);
+    border-color: rgba(239,68,68,0.3);
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .card-title {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  /* ── Score grid ── */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .score-tile {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 12px;
+    text-align: center;
+  }
+
+  .score-tile .label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .score-tile .value {
+    font-family: var(--font-sans);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  /* ── Chart ── */
+  #chartWrap {
+    position: relative;
+    height: 280px;
+  }
+
+  /* ── Summary ── */
+  #summary-text {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+    background: var(--surface2);
+    border-left: 3px solid var(--accent2);
+    padding: 16px 20px;
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* ── Commits table ── */
+  .commit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .commit-row {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .commit-row:hover { border-color: var(--accent); }
+
+  .commit-sha {
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .commit-info { min-width: 0; }
+
+  .commit-msg {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+
+  .commit-meta {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .commit-health {
+    font-family: var(--font-sans);
+    font-size: 20px;
+    font-weight: 800;
+    min-width: 44px;
+    text-align: right;
+  }
+
+  /* ── Alerts ── */
+  .alerts {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .alert-pill {
+    font-size: 11px;
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.3);
+    color: var(--warn);
+    border-radius: 4px;
+    padding: 4px 10px;
+  }
+
+  /* ── Expanded commit detail ── */
+  .commit-detail {
+    display: none;
+    border-top: 1px solid var(--border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .commit-detail.open { display: block; }
+
+  .metric-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 44px;
+    gap: 10px;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .bar-label { color: var(--muted); }
+
+  .bar-track {
+    background: var(--border);
+    border-radius: 2px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .bar-val { text-align: right; color: var(--text); font-weight: 700; }
+
+  .hotspot-tags {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .hotspot-tag {
+    background: rgba(124,58,237,0.15);
+    border: 1px solid rgba(124,58,237,0.3);
+    color: #a78bfa;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  .ai-note {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+
+  /* ── Score color coding ── */
+  .score-green { color: var(--accent); }
+  .score-yellow { color: var(--warn); }
+  .score-red { color: var(--danger); }
+
+  /* ── Loader ── */
+  .loader {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    color: var(--accent);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  .loader.active { display: flex; }
+
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(0,255,157,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Results section ── */
+  #results { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="eyebrow">// Engineering Intelligence</div>
+    <h1>Repo Health<br>Intelligence</h1>
+    <p>Deterministic code health analysis over commit history.<br>
+    Complexity · Churn · Hotspots · Bus Factor · Stability</p>
+  </header>
+
+  <div class="input-section">
+    <div class="input-group">
+      <label>Repository URL</label>
+      <input type="text" id="repoUrl"
+        placeholder="https://github.com/owner/repo"
+        value="">
+    </div>
+    <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze →</button>
+    <div id="error-box" style="display:none; color:#ef4444; margin-top:10px;"></div>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <span id="loaderText">Cloning repository…</span>
+  </div>
+
+  <div id="results">
+
+    <!-- Score Summary -->
+    <div class="score-grid" id="scoreGrid"></div>
+
+    <!-- Chart -->
+    <div class="card">
+      <div class="card-title">Health Score Over Commits</div>
+      <div id="chartWrap">
+        <canvas id="healthChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="card">
+      <div class="card-title">Repository Summary</div>
+      <div id="summary-text"></div>
+    </div>
+
+    <!-- Alerts Box -->
+    <div id="alerts-box" class="card"></div>
+
+    <!-- Commit list -->
+    <div class="card">
+      <div class="card-title">Commit History</div>
+      <div class="commit-list" id="commitList"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
