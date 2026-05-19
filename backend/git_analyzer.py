@@ -41,10 +41,47 @@ def get_commits(repo: Repo) -> List[Any]:
 
 def sample_commits(commits: List[Any]) -> List[Any]:
     """
-    Fast demo-mode sampling.
-    Analyze only latest 10 commits.
+    Smart scalable sampling.
+
+    Small repos:
+        analyze all commits
+
+    Medium repos:
+        every 2nd commit
+
+    Large repos:
+        every 4th commit
+
+    Very large repos:
+        every 8th commit
     """
-    return commits[-15:]
+
+    total = len(commits)
+
+    if total <= 100:
+        sampled = commits
+
+    elif total <= 300:
+        sampled = commits[::2]
+
+    elif total <= 1000:
+        sampled = commits[::4]
+
+    else:
+        sampled = commits[::8]
+
+    # Keep latest commit
+    if commits[-1] not in sampled:
+        sampled.append(commits[-1])
+
+    # Prevent huge analysis loads
+    MAX_ANALYZED = 150
+
+    if len(sampled) > MAX_ANALYZED:
+        step = max(1, len(sampled) // MAX_ANALYZED)
+        sampled = sampled[::step]
+
+    return sampled
 
 
 def checkout_commit(repo: Repo, commit: Any) -> bool:
